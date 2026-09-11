@@ -1,43 +1,34 @@
-import { useEffect, useState } from 'react'
-import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore'
-import { db } from '../firebase.js'
+import { useState, useEffect } from "react";
+import { collection, getDocs, query } from "firebase/firestore";
+import { db } from "../firebase";
 
-export const useFirestore = (collectionName, filterField = null, filterValue = null) => {
-  const [data, setData] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+export const useFirestore = (collectionName) => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    try {
-      let q
-      if (filterField && filterValue) {
-        q = query(
-          collection(db, collectionName), 
-          where(filterField, '==', filterValue),
-          orderBy('createdAt', 'desc')
-        )
-      } else {
-        q = query(collection(db, collectionName), orderBy('createdAt', 'desc'))
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const q = query(collection(db, collectionName));
+        const snapshot = await getDocs(q);
+        const docs = snapshot.docs.map(doc => ({
+          id: doc.id,
+         ...doc.data()
+        }));
+        setData(docs);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const unsub = onSnapshot(q, 
-        (snap) => {
-          const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-          setData(docs)
-          setLoading(false)
-        },
-        (err) => {
-          setError(err.message)
-          setLoading(false)
-        }
-      )
+    fetchData();
+  }, [collectionName]);
 
-      return () => unsub()
-    } catch (err) {
-      setError(err.message)
-      setLoading(false)
-    }
-  }, [collectionName, filterField, filterValue])
+  return { data, loading, error };
+};
 
-  return { data, loading, error }
-}
+export default useFirestore;
